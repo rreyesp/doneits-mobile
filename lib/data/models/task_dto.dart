@@ -5,6 +5,7 @@ import 'package:vikunja_app/data/models/task_attachment_dto.dart';
 import 'package:vikunja_app/data/models/task_reminder_dto.dart';
 import 'package:vikunja_app/data/models/user_dto.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
+import 'package:flutter/foundation.dart';
 
 class TaskDto extends Dto<Task> {
   final int id;
@@ -24,6 +25,7 @@ class TaskDto extends Dto<Task> {
   final List<TaskDto> subtasks;
   final List<LabelDto> labels;
   final List<TaskAttachmentDto> attachments;
+  final List<UserDto> assignees;
 
   TaskDto({
     this.id = 0,
@@ -44,6 +46,7 @@ class TaskDto extends Dto<Task> {
     this.subtasks = const [],
     this.labels = const [],
     this.attachments = const [],
+    this.assignees = const [],
     DateTime? created,
     DateTime? updated,
     required this.createdBy,
@@ -63,12 +66,14 @@ class TaskDto extends Dto<Task> {
                 .map((ts) => TaskReminderDto.fromJson(ts))
                 .toList()
           : [],
-      dueDate = DateTime.parse(json['due_date']),
-      startDate = DateTime.parse(json['start_date']),
-      endDate = DateTime.parse(json['end_date']),
+     dueDate = json['due_date'] != null ? DateTime.parse(json['due_date']) : null,
+startDate = json['start_date'] != null ? DateTime.parse(json['start_date']) : null,
+endDate = json['end_date'] != null ? DateTime.parse(json['end_date']) : null,
       parentTaskId = json['parent_task_id'],
       priority = json['priority'],
-      repeatAfter = Duration(seconds: json['repeat_after']),
+     repeatAfter = json['repeat_after'] != null
+    ? Duration(seconds: json['repeat_after'])
+    : null,
       color = json['hex_color'] != ''
           ? Color(int.parse(json['hex_color'], radix: 16) + 0xFF000000)
           : null,
@@ -91,6 +96,11 @@ class TaskDto extends Dto<Task> {
       attachments = json['attachments'] != null
           ? (json['attachments'] as List<dynamic>)
                 .map((attachment) => TaskAttachmentDto.fromJSON(attachment))
+                .toList()
+          : [],
+      assignees = json['assignees'] != null
+          ? (json['assignees'] as List<dynamic>)
+                .map((assignee) => UserDto.fromJson(assignee))
                 .toList()
           : [],
       updated = DateTime.parse(json['updated']),
@@ -126,6 +136,7 @@ class TaskDto extends Dto<Task> {
     'attachments': attachments
         .map((attachment) => attachment.toJSON())
         .toList(),
+
     'bucket_id': bucketId,
     'created_by': createdBy?.toJSON(),
     'updated': updated.toUtc().toIso8601String(),
@@ -133,7 +144,12 @@ class TaskDto extends Dto<Task> {
   };
 
   @override
-  Task toDomain() => Task(
+Task toDomain() {
+  debugPrint(
+    'TASK: $title / assignees: ${assignees.map((u) => u.username).toList()}',
+  );
+
+  return Task(
     id: id,
     title: title,
     description: description,
@@ -152,12 +168,14 @@ class TaskDto extends Dto<Task> {
     labels: labels.map((e) => e.toDomain()).toList(),
     subtasks: subtasks.map((e) => e.toDomain()).toList(),
     attachments: attachments.map((e) => e.toDomain()).toList(),
+    assignees: assignees.map((e) => e.toDomain()).toList(),
     updated: updated,
     created: created,
     projectId: projectId,
     bucketId: bucketId,
     createdBy: createdBy?.toDomain(),
   );
+}
 
   static TaskDto fromDomain(Task b) => TaskDto(
     id: b.id,
@@ -182,6 +200,7 @@ class TaskDto extends Dto<Task> {
     attachments: b.attachments
         .map((e) => TaskAttachmentDto.fromDomain(e))
         .toList(),
+    assignees: b.assignees.map((e) => UserDto.fromDomain(e)).toList(),
     updated: b.updated,
     created: b.created,
     projectId: b.projectId,

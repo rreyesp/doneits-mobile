@@ -1,2 +1,4 @@
 {
+"appName": "Doneits",
+"sentryDialogMessage": "Te gustaría ayudarnos a mejorar Doneits enviando reportes de errores? Al activarlo, se enviarán reportes automáticos usando Sentry."
 }

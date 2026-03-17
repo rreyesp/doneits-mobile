@@ -89,15 +89,17 @@ class InitPage extends ConsumerWidget {
   }
 
   Future<void> onLoginSuccess(WidgetRef ref, Version? serverVersion) async {
-    if (serverVersion != null && serverVersion != supportedServerVersion) {
-      await showDialog<void>(
-        context: ref.context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return VersionMismatchDialog(serverVersion: serverVersion);
-        },
-      );
-    }
+ if (serverVersion != null &&
+    serverVersion.toString().split('-').first !=
+        supportedServerVersion.toString().split('-').first) {
+  await showDialog<void>(
+    context: ref.context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return VersionMismatchDialog(serverVersion: serverVersion);
+    },
+  );
+}
 
     globalNavigatorKey.currentState?.pushReplacementNamed("/home");
   }

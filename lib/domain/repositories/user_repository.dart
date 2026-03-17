@@ -15,6 +15,8 @@ abstract class UserRepository {
 
   Future<Response<User>> getCurrentUser();
 
+  Future<Response<List<User>>> searchUsers(String search);
+
   Future<Response<UserSettings>> setCurrentUserSettings(
     UserSettings userSettings,
   );

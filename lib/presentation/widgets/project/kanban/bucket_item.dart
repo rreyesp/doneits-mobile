@@ -99,7 +99,7 @@ class _BucketColumnState extends ConsumerState<BucketColumn> {
             onMove: (_) => _safeSet(() => _isTaskHovering = true),
             onLeave: (_) => _safeSet(() => _isTaskHovering = false),
             onAcceptWithDetails: (details) {
-              widget.onAnyDragEnded(); // stop horizontal auto-scroll
+              widget.onAnyDragEnded();
               widget.onMoveTask(
                 project: widget.project,
                 buckets: widget.buckets,
@@ -331,37 +331,39 @@ class _BucketColumnState extends ConsumerState<BucketColumn> {
     return showDialog(
       context: context,
       builder: (_) => AddTaskDialog(
-        onAddTask: (title, dueDate) => _addItem(title, context),
+        projectId: widget.project.id,
+        onAddTask: (taskDraft) => _addItem(taskDraft, context),
       ),
     );
   }
 
-  Future<void> _addItem(String title, BuildContext context) async {
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null) {
-      return;
-    }
-
-    final newTask = Task(
-      title: title,
-      bucketId: widget.bucket.id,
-      createdBy: currentUser,
-      done: false,
-      projectId: widget.project.id,
-    );
-
-    var success = await ref
-        .read(projectControllerProvider(widget.project).notifier)
-        .addTask(widget.project, newTask);
-
-    if (context.mounted && success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).taskAddedSuccess)),
-      );
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).taskAddError)),
-      );
-    }
+  Future<(bool, String?)> _addItem(Task taskDraft, BuildContext context) async {
+  final currentUser = ref.read(currentUserProvider);
+  if (currentUser == null) {
+    return (false, 'No current user');
   }
+
+  final newTask = Task(
+    title: taskDraft.title,
+    dueDate: taskDraft.dueDate,
+    priority: taskDraft.priority,
+    color: taskDraft.color,
+    labels: taskDraft.labels,
+    assignees: taskDraft.assignees,
+    bucketId: widget.bucket.id,
+    createdBy: currentUser,
+    done: false,
+    projectId: widget.project.id,
+  );
+
+  final success = await ref
+      .read(projectControllerProvider(widget.project).notifier)
+      .addTask(widget.project, newTask);
+
+  if (success) {
+    return (true, null);
+  }
+
+  return (false, AppLocalizations.of(context).taskAddError);
+}
 }

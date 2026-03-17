@@ -15,6 +15,7 @@ import 'package:vikunja_app/core/utils/repeat_after_unit.dart';
 import 'package:vikunja_app/domain/entities/label.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/entities/task_reminder.dart';
+import 'package:vikunja_app/domain/entities/user.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 import 'package:vikunja_app/presentation/manager/task_page_controller.dart';
 import 'package:vikunja_app/presentation/pages/task/edit_description.dart';
@@ -25,10 +26,28 @@ import 'package:vikunja_app/presentation/widgets/task/task_comments.dart';
 import 'package:vikunja_app/presentation/widgets/task/task_delete_dialog.dart';
 import 'package:vikunja_app/presentation/widgets/task/task_save_dialog.dart';
 
+enum TaskEditSection {
+  title,
+  description,
+  dueDate,
+  startDate,
+  endDate,
+  repeatAfter,
+  reminders,
+  priority,
+  labels,
+  assignees,
+  color,
+}
+
 class TaskEditPage extends ConsumerStatefulWidget {
   final Task task;
+  final TaskEditSection? initialSection;
 
-  TaskEditPage({required this.task}) : super(key: Key(task.toString()));
+  TaskEditPage({
+    required this.task,
+    this.initialSection,
+  }) : super(key: Key(task.toString()));
 
   @override
   TaskEditPageState createState() => TaskEditPageState();
@@ -37,6 +56,20 @@ class TaskEditPage extends ConsumerStatefulWidget {
 class TaskEditPageState extends ConsumerState<TaskEditPage> {
   final _formKey = GlobalKey<FormState>();
 
+  final _titleFocusNode = FocusNode();
+
+  final _titleKey = GlobalKey();
+  final _descriptionKey = GlobalKey();
+  final _dueDateKey = GlobalKey();
+  final _startDateKey = GlobalKey();
+  final _endDateKey = GlobalKey();
+  final _repeatAfterKey = GlobalKey();
+  final _remindersKey = GlobalKey();
+  final _priorityKey = GlobalKey();
+  final _labelsKey = GlobalKey();
+  final _assigneesKey = GlobalKey();
+  final _colorKey = GlobalKey();
+
   String? _title, _description;
   DateTime? _dueDate, _startDate, _endDate;
   int _repeatAfterValue = 0;
@@ -44,13 +77,19 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
   int? _priority;
   List<TaskReminder>? _reminderDates;
   List<Label>? _labels;
+  List<User> _assignees = [];
+  List<User> _foundUsers = [];
+  User? _selectedUser;
+  bool _isSearchingUsers = false;
+  bool _isAddingUser = false;
   Color? _color;
 
-  // we use this to find the label object after a user taps on the suggestion, because the typeahead only uses strings, not full objects.
   List<Label>? _suggestedLabels;
   final _labelTypeAheadController = TextEditingController();
+  final _assigneeSearchController = TextEditingController();
 
   Timer? _debounce;
+  Timer? _userSearchDebounce;
   Completer<Iterable<String>>? _lastCompleter;
 
   bool changed = false;
@@ -59,6 +98,7 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
   void initState() {
     _reminderDates = List.of(widget.task.reminderDates);
     _labels = List.of(widget.task.labels);
+    _assignees = List.of(widget.task.assignees);
 
     _priority = widget.task.priority;
     _description = widget.task.description;
@@ -74,13 +114,91 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
     _repeatAfterUnit = getRepeatAfterTypeFromDuration(widget.task.repeatAfter);
 
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openInitialSection();
+    });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _userSearchDebounce?.cancel();
     _labelTypeAheadController.dispose();
+    _assigneeSearchController.dispose();
+    _titleFocusNode.dispose();
     super.dispose();
+  }
+
+  void _openInitialSection() {
+    final section = widget.initialSection;
+    if (section == null) return;
+
+    switch (section) {
+      case TaskEditSection.title:
+        _scrollToKey(_titleKey);
+        _titleFocusNode.requestFocus();
+        break;
+      case TaskEditSection.description:
+        _scrollToKey(_descriptionKey);
+        Future.delayed(const Duration(milliseconds: 200), () async {
+          if (!mounted) return;
+          var description = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (buildContext) =>
+                  EditDescription(initialText: _description),
+            ),
+          );
+          if (!mounted) return;
+          setState(() {
+            if (description != null) {
+              _description = description;
+              _checkChanged();
+            }
+          });
+        });
+        break;
+      case TaskEditSection.dueDate:
+        _scrollToKey(_dueDateKey);
+        break;
+      case TaskEditSection.startDate:
+        _scrollToKey(_startDateKey);
+        break;
+      case TaskEditSection.endDate:
+        _scrollToKey(_endDateKey);
+        break;
+      case TaskEditSection.repeatAfter:
+        _scrollToKey(_repeatAfterKey);
+        break;
+      case TaskEditSection.reminders:
+        _scrollToKey(_remindersKey);
+        break;
+      case TaskEditSection.priority:
+        _scrollToKey(_priorityKey);
+        break;
+      case TaskEditSection.labels:
+        _scrollToKey(_labelsKey);
+        break;
+      case TaskEditSection.assignees:
+        _scrollToKey(_assigneesKey);
+        break;
+      case TaskEditSection.color:
+        _scrollToKey(_colorKey);
+        break;
+    }
+  }
+
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: 0.15,
+      );
+    }
   }
 
   @override
@@ -95,13 +213,20 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
       child: Scaffold(
         appBar: _buildAppBar(),
         body: _buildForm(context),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            if (_formKey.currentState?.validate() == true) {
-              _saveTask(ctx);
-            }
-          },
-          child: Icon(Icons.save),
+        bottomNavigationBar: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () {
+                if (_formKey.currentState?.validate() == true) {
+                  _saveTask(ctx);
+                }
+              },
+              icon: const Icon(Icons.save_outlined),
+              label: Text(AppLocalizations.of(context).save),
+            ),
+          ),
         ),
       ),
     );
@@ -109,10 +234,26 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
 
   AppBar _buildAppBar() {
     return AppBar(
-      title: Text(AppLocalizations.of(context).editTaskTitle),
+      centerTitle: false,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppLocalizations.of(context).editTaskTitle),
+          Text(
+            widget.task.title.isNotEmpty
+                ? widget.task.title
+                : AppLocalizations.of(context).newTaskName,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).hintColor,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
       actions: [
         IconButton(
-          icon: Icon(Icons.delete),
+          tooltip: AppLocalizations.of(context).delete,
+          icon: const Icon(Icons.delete_outline),
           onPressed: () {
             showDialog(
               context: context,
@@ -155,31 +296,173 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
     return Form(
       key: _formKey,
       child: ListView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 50),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         children: <Widget>[
-          _buildTitle(),
-          _buildDescription(context),
-          _buildDueDate(),
-          _buildStartDate(),
-          _buildEndDate(),
-          _buildRepeatAfter(),
-          _buildReminderList(),
-          _buildAddReminderButton(context),
-          _buildPriority(),
-          _buildAddLabel(context),
-          _buildLabelList(),
-          _buildColor(),
-          _buildAttachments(),
-          _buildComments(),
+          _buildHeroHeader(),
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            title: 'Información básica',
+            icon: Icons.edit_note,
+            children: [
+              _buildTitle(),
+              const SizedBox(height: 12),
+              _buildDescription(context),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            title: 'Planificación',
+            icon: Icons.schedule,
+            children: [
+              _buildDueDate(),
+              _buildStartDate(),
+              _buildEndDate(),
+              _buildRepeatAfter(),
+              _buildReminderList(),
+              _buildAddReminderButton(context),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            title: 'Organización',
+            icon: Icons.dashboard_customize_outlined,
+            children: [
+              _buildPriority(),
+              const SizedBox(height: 16),
+              _buildAssignees(),
+              const SizedBox(height: 16),
+              _buildAddLabel(context),
+              const SizedBox(height: 12),
+              _buildLabelList(),
+              const SizedBox(height: 16),
+              _buildColor(),
+            ],
+          ),
+          if (widget.task.attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildSectionCard(
+              title: 'Adjuntos',
+              icon: Icons.attach_file,
+              children: [
+                _buildAttachments(),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            title: 'Comentarios',
+            icon: Icons.comment_outlined,
+            children: [
+              _buildComments(),
+            ],
+          ),
         ],
       ),
     );
   }
 
+  Widget _buildHeroHeader() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Theme.of(context).colorScheme.primaryContainer,
+            Theme.of(context).colorScheme.secondaryContainer,
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 52,
+            width: 52,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: .7),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.task_alt,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.task.id == 0
+                      ? AppLocalizations.of(context).newTaskName
+                      : AppLocalizations.of(context).editTaskTitle,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Organiza los detalles, fechas, recordatorios y prioridad en un solo lugar.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(
+                      alpha: .75,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: Theme.of(context).dividerColor.withValues(alpha: .35),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTitle() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
+    return Container(
+      key: _titleKey,
       child: TextFormField(
+        focusNode: _titleFocusNode,
         maxLines: null,
         keyboardType: TextInputType.multiline,
         initialValue: widget.task.title,
@@ -187,18 +470,26 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
           _title = title;
           _checkChanged();
         },
+        style: Theme.of(context).textTheme.titleMedium,
         decoration: InputDecoration(
           labelText: AppLocalizations.of(context).title,
-          border: OutlineInputBorder(),
+          hintText: AppLocalizations.of(context).newTaskName,
+          prefixIcon: const Icon(Icons.title),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDescription(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
+    final hasDescription = _description != null && _description!.isNotEmpty;
+
+    return Container(
+      key: _descriptionKey,
       child: InkWell(
+        borderRadius: BorderRadius.circular(14),
         onTap: () async {
           var description = await Navigator.push(
             context,
@@ -214,31 +505,165 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
             }
           });
         },
-        child: Row(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Icon(Icons.description_outlined),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      AppLocalizations.of(context).description,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).dividerColor),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.description_outlined,
+                    color: Theme.of(context).hintColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    AppLocalizations.of(context).description,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: Theme.of(context).hintColor,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              hasDescription
+                  ? HtmlWidget(_description!)
+                  : Text(
+                      AppLocalizations.of(context).noDescription,
+                      style: TextStyle(
                         color: Theme.of(context).hintColor,
-                        fontWeight: FontWeight.normal,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
-                    HtmlWidget(
-                      _description != null && _description?.isNotEmpty == true
-                          ? _description!
-                          : AppLocalizations.of(context).noDescription,
-                    ),
-                  ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDueDate() {
+    return Container(
+      key: _dueDateKey,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: VikunjaDateTimeField(
+          icon: const Icon(Icons.event_available),
+          label: AppLocalizations.of(context).dueDateLabel,
+          initialValue: widget.task.dueDate,
+          onChanged: (duedate) {
+            _dueDate = duedate;
+            _checkChanged();
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStartDate() {
+    return Container(
+      key: _startDateKey,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: VikunjaDateTimeField(
+          icon: const Icon(Icons.play_circle_outline),
+          label: AppLocalizations.of(context).startDateLabel,
+          initialValue: widget.task.startDate,
+          onChanged: (startDate) {
+            _startDate = startDate;
+            _checkChanged();
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEndDate() {
+    return Container(
+      key: _endDateKey,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: VikunjaDateTimeField(
+          icon: const Icon(Icons.stop_circle_outlined),
+          label: AppLocalizations.of(context).endDateLabel,
+          initialValue: widget.task.endDate,
+          onChanged: (endDate) {
+            _endDate = endDate;
+            _checkChanged();
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRepeatAfter() {
+    var localizations = AppLocalizations.of(context);
+
+    return Container(
+      key: _repeatAfterKey,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest
+              .withValues(alpha: .35),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.repeat),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 3,
+              child: TextFormField(
+                keyboardType: TextInputType.number,
+                initialValue: getRepeatAfterValueFromDuration(
+                  widget.task.repeatAfter,
+                ).toString(),
+                onChanged: (newValue) {
+                  _repeatAfterValue = int.tryParse(newValue) ?? 0;
+                  _checkChanged();
+                },
+                decoration: InputDecoration(
+                  labelText: localizations.repeatAfter,
+                  border: InputBorder.none,
+                  isDense: true,
                 ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: DropdownButtonFormField<RepeatAfterUnit>(
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+                isExpanded: true,
+                initialValue: _repeatAfterUnit,
+                onChanged: (RepeatAfterUnit? newType) {
+                  if (newType != null) {
+                    _repeatAfterUnit = newType;
+                  }
+                  _checkChanged();
+                },
+                items: RepeatAfterUnit.values
+                    .map<DropdownMenuItem<RepeatAfterUnit>>((value) {
+                      return DropdownMenuItem<RepeatAfterUnit>(
+                        value: value,
+                        child: Text(value.toLocalizedString(context)),
+                      );
+                    })
+                    .toList(),
               ),
             ),
           ],
@@ -247,124 +672,25 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
     );
   }
 
-  Widget _buildDueDate() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
-      child: VikunjaDateTimeField(
-        icon: Icon(Icons.access_time),
-        label: AppLocalizations.of(context).dueDateLabel,
-        initialValue: widget.task.dueDate,
-        onChanged: (duedate) {
-          _dueDate = duedate;
-          _checkChanged();
-        },
-      ),
-    );
-  }
-
-  Widget _buildStartDate() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
-      child: VikunjaDateTimeField(
-        label: AppLocalizations.of(context).startDateLabel,
-        initialValue: widget.task.startDate,
-        onChanged: (startDate) {
-          _startDate = startDate;
-          _checkChanged();
-        },
-      ),
-    );
-  }
-
-  Widget _buildEndDate() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
-      child: VikunjaDateTimeField(
-        label: AppLocalizations.of(context).endDateLabel,
-        initialValue: widget.task.endDate,
-        onChanged: (endDate) {
-          _endDate = endDate;
-          _checkChanged();
-        },
-      ),
-    );
-  }
-
-  Widget _buildRepeatAfter() {
-    var localizations = AppLocalizations.of(context);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Flexible(
-            flex: 65,
-            child: TextFormField(
-              keyboardType: TextInputType.number,
-              initialValue: getRepeatAfterValueFromDuration(
-                widget.task.repeatAfter,
-              ).toString(),
-              onChanged: (newValue) {
-                _repeatAfterValue = int.tryParse(newValue) ?? 0;
-                _checkChanged();
-              },
-              decoration: InputDecoration(
-                labelText: localizations.repeatAfter,
-                border: InputBorder.none,
-                icon: Icon(Icons.repeat),
-                contentPadding: EdgeInsets.fromLTRB(0, 0, 0, 0),
-              ),
-            ),
-          ),
-          Spacer(),
-          Flexible(
-            flex: 30,
-            child: DropdownButtonFormField<RepeatAfterUnit>(
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.fromLTRB(0, 0, 0, 0),
-              ),
-              isExpanded: true,
-              initialValue: _repeatAfterUnit,
-              onChanged: (RepeatAfterUnit? newType) {
-                if (newType != null) {
-                  _repeatAfterUnit = newType;
-                }
-                _checkChanged();
-              },
-              items: RepeatAfterUnit.values
-                  .map<DropdownMenuItem<RepeatAfterUnit>>((
-                    RepeatAfterUnit value,
-                  ) {
-                    return DropdownMenuItem<RepeatAfterUnit>(
-                      value: value,
-                      child: Text(value.toLocalizedString(context)),
-                    );
-                  })
-                  .toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildReminderList() {
     return Padding(
-      padding: EdgeInsets.only(top: 8.0),
+      padding: const EdgeInsets.only(top: 8.0),
       child: Column(
         children:
             _reminderDates?.map((e) {
-              return VikunjaDateTimeField(
-                label: AppLocalizations.of(context).reminder,
-                initialValue: e.reminder,
-                onChanged: (date) {
-                  if (date != null) {
-                    e.reminder = date;
-                  } else {
-                    _reminderDates?.remove(e);
-                  }
-                },
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                child: VikunjaDateTimeField(
+                  label: AppLocalizations.of(context).reminder,
+                  initialValue: e.reminder,
+                  onChanged: (date) {
+                    if (date != null) {
+                      e.reminder = date;
+                    } else {
+                      _reminderDates?.remove(e);
+                    }
+                  },
+                ),
               );
             }).toList() ??
             [],
@@ -373,67 +699,57 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
   }
 
   Widget _buildAddReminderButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: GestureDetector(
-        child: Row(
-          children: <Widget>[
-            Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Icon(Icons.alarm_add, color: Colors.grey),
-            ),
-            Text(
-              AppLocalizations.of(context).addReminder,
-              style: TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-          ],
+    return Container(
+      key: _remindersKey,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 4),
+        child: OutlinedButton.icon(
+          onPressed: () => _addNewReminder(context),
+          icon: const Icon(Icons.alarm_add_outlined),
+          label: Text(AppLocalizations.of(context).addReminder),
         ),
-        onTap: () => _addNewReminder(context),
       ),
     );
   }
 
   Widget _buildPriority() {
-    return DropdownButtonFormField<String>(
-      decoration: InputDecoration(
-        icon: const Icon(Icons.flag),
-        labelText: AppLocalizations.of(context).priority,
-        border: InputBorder.none,
+    return Container(
+      key: _priorityKey,
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.flag_outlined),
+          labelText: AppLocalizations.of(context).priority,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        initialValue: priorityToString(AppLocalizations.of(context), _priority),
+        isExpanded: true,
+        onChanged: (String? newValue) {
+          _priority = priorityFromString(AppLocalizations.of(context), newValue);
+          _checkChanged();
+        },
+        items:
+            [
+              AppLocalizations.of(context).priorityUnset,
+              AppLocalizations.of(context).priorityLow,
+              AppLocalizations.of(context).priorityMedium,
+              AppLocalizations.of(context).priorityHigh,
+              AppLocalizations.of(context).priorityUrgent,
+              AppLocalizations.of(context).priorityDoNow,
+            ].map((String value) {
+              return DropdownMenuItem(value: value, child: Text(value));
+            }).toList(),
       ),
-      initialValue: priorityToString(AppLocalizations.of(context), _priority),
-      isExpanded: true,
-      onChanged: (String? newValue) {
-        _priority = priorityFromString(AppLocalizations.of(context), newValue);
-        _checkChanged();
-      },
-      items:
-          [
-            AppLocalizations.of(context).priorityUnset,
-            AppLocalizations.of(context).priorityLow,
-            AppLocalizations.of(context).priorityMedium,
-            AppLocalizations.of(context).priorityHigh,
-            AppLocalizations.of(context).priorityUrgent,
-            AppLocalizations.of(context).priorityDoNow,
-          ].map((String value) {
-            return DropdownMenuItem(value: value, child: Text(value));
-          }).toList(),
     );
   }
 
   Widget _buildAddLabel(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return Container(
+      key: _labelsKey,
       child: Row(
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(right: 15, left: 2),
-            child: Icon(Icons.label, color: Colors.grey),
-          ),
-          SizedBox(
-            width:
-                MediaQuery.of(context).size.width -
-                80 -
-                ((IconTheme.of(context).size ?? 0) * 2),
+          Expanded(
             child: Autocomplete<String>(
               optionsBuilder: (TextEditingValue textEditingValue) {
                 if (textEditingValue.text == '') {
@@ -462,11 +778,32 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
               onSelected: (String selection) {
                 _addLabel(selection);
               },
+              fieldViewBuilder:
+                  (
+                    BuildContext context,
+                    TextEditingController textEditingController,
+                    FocusNode focusNode,
+                    VoidCallback onFieldSubmitted,
+                  ) {
+                    return TextFormField(
+                      controller: textEditingController,
+                      focusNode: focusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Etiqueta',
+                        hintText: 'Buscar o crear etiqueta',
+                        prefixIcon: const Icon(Icons.label_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    );
+                  },
             ),
           ),
-          IconButton(
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
             onPressed: () => _createAndAddLabel(_labelTypeAheadController.text),
-            icon: Icon(Icons.add),
+            icon: const Icon(Icons.add),
           ),
         ],
       ),
@@ -474,68 +811,77 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
   }
 
   Widget _buildColor() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(right: 15, left: 2),
-            child: Icon(Icons.palette, color: Colors.grey),
-          ),
-          ElevatedButton(
-            style: (_color == null || _color == Colors.black)
-                ? null
-                : ButtonStyle(
-                    backgroundColor: WidgetStateProperty.resolveWith(
-                      (_) => _color,
-                    ),
-                  ),
-            onPressed: _onColorEdit,
-            child: Text(
-              AppLocalizations.of(context).setColor,
-              style: (_color == null || _color == Colors.black)
-                  ? null
-                  : TextStyle(
-                      color: (_color)!.computeLuminance() > 0.5
-                          ? Colors.black
-                          : Colors.white,
-                    ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 15),
-            child: () {
-              Color? color = (_color == null || _color == Colors.black)
-                  ? null
-                  : _color;
+    final Color? effectiveColor = (_color == null || _color == Colors.black)
+        ? null
+        : _color;
 
-              return Text(
-                color != null
-                    ? "#${color.toHexString()}"
-                    : AppLocalizations.of(context).none,
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontStyle: FontStyle.italic,
+    return Container(
+      key: _colorKey,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest
+              .withValues(alpha: .35),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: <Widget>[
+            const Icon(Icons.palette_outlined),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                style: effectiveColor == null
+                    ? null
+                    : ButtonStyle(
+                        backgroundColor: WidgetStateProperty.resolveWith(
+                          (_) => effectiveColor,
+                        ),
+                      ),
+                onPressed: _onColorEdit,
+                child: Text(
+                  AppLocalizations.of(context).setColor,
+                  style: effectiveColor == null
+                      ? null
+                      : TextStyle(
+                          color: effectiveColor.computeLuminance() > 0.5
+                              ? Colors.black
+                              : Colors.white,
+                        ),
                 ),
-              );
-            }(),
-          ),
-        ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              effectiveColor != null
+                  ? "#${effectiveColor.toHexString()}"
+                  : AppLocalizations.of(context).none,
+              style: TextStyle(
+                color: Theme.of(context).hintColor,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAttachments() {
     return ListView.separated(
-      separatorBuilder: (context, index) => Divider(),
-      padding: const EdgeInsets.all(16.0),
+      separatorBuilder: (context, index) => const Divider(),
+      padding: EdgeInsets.zero,
       shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: widget.task.attachments.length,
       itemBuilder: (context, index) {
         return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const CircleAvatar(
+            child: Icon(Icons.attach_file),
+          ),
           title: Text(widget.task.attachments[index].file.name),
           trailing: IconButton(
-            icon: Icon(Icons.download),
+            icon: const Icon(Icons.download_outlined),
             onPressed: () async {
               var taskId = await ref
                   .read(taskRepositoryProvider)
@@ -555,22 +901,33 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
 
   Widget _buildComments() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.only(top: 4.0),
       child: TaskComments(taskId: widget.task.id),
     );
   }
 
   Widget _buildLabelList() {
+    final items = _labels ?? [];
+
+    if (items.isEmpty) {
+      return Text(
+        'No hay etiquetas agregadas.',
+        style: TextStyle(
+          color: Theme.of(context).hintColor,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+
     return Wrap(
       spacing: 10,
-      children:
-          _labels?.map((label) {
-            return LabelWidget(
-              label: label,
-              onDelete: () => _removeLabel(label),
-            );
-          }).toList() ??
-          [],
+      runSpacing: 10,
+      children: items.map((label) {
+        return LabelWidget(
+          label: label,
+          onDelete: () => _removeLabel(label),
+        );
+      }).toList(),
     );
   }
 
@@ -614,7 +971,6 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
   }
 
   void _createAndAddLabel(String labelTitle) async {
-    // Only add a label if there are none to add
     if (labelTitle.isEmpty ||
         _suggestedLabels?.firstWhereOrNull(
               (label) => label.title == labelTitle,
@@ -721,6 +1077,187 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
     );
   }
 
+  Widget _buildAssignees() {
+    return Container(
+      key: _assigneesKey,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Theme.of(context)
+              .colorScheme
+              .surfaceContainerHighest
+              .withValues(alpha: .35),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _assigneeSearchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por username',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      _userSearchDebounce?.cancel();
+                      _userSearchDebounce = Timer(
+                        const Duration(milliseconds: 400),
+                        () {
+                          _searchUsers(value);
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  onPressed: _selectedUser == null || _isAddingUser
+                      ? null
+                      : _addSelectedUser,
+                  icon: _isAddingUser
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_add_alt_1),
+                ),
+              ],
+            ),
+            if (_isSearchingUsers) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
+            ],
+            if (_foundUsers.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ..._foundUsers.map(
+                (user) => RadioListTile<int>(
+                  value: user.id,
+                  groupValue: _selectedUser?.id,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(user.name.isNotEmpty ? user.name : user.username),
+                  subtitle: Text(user.username),
+                  onChanged: (_) {
+                    setState(() {
+                      _selectedUser = user;
+                    });
+                  },
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (_assignees.isEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'No hay usuarios asignados.',
+                  style: TextStyle(
+                    color: Theme.of(context).hintColor,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              )
+            else
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _assignees.map((user) {
+                  final displayName =
+                      user.name.isNotEmpty ? user.name : user.username;
+
+                  return Chip(
+                    avatar: CircleAvatar(
+                      child: Text(
+                        displayName.isNotEmpty
+                            ? displayName[0].toUpperCase()
+                            : '?',
+                      ),
+                    ),
+                    label: Text(displayName),
+                    deleteIcon: const Icon(Icons.close),
+                    onDeleted: () => _removeAssignee(user),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _searchUsers(String value) async {
+    final query = value.trim();
+
+    if (query.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _foundUsers = [];
+        _selectedUser = null;
+        _isSearchingUsers = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearchingUsers = true;
+      _selectedUser = null;
+    });
+
+    final response = await ref.read(userRepositoryProvider).searchUsers(query);
+
+    if (!mounted) return;
+
+    if (response.isSuccessful) {
+      final assignedIds = _assignees.map((e) => e.id).toSet();
+
+      setState(() {
+        _foundUsers = response.toSuccess().body.where((user) {
+          return !assignedIds.contains(user.id);
+        }).toList();
+        _isSearchingUsers = false;
+      });
+    } else {
+      setState(() {
+        _foundUsers = [];
+        _isSearchingUsers = false;
+      });
+    }
+  }
+
+  Future<void> _addSelectedUser() async {
+    final user = _selectedUser;
+    if (user == null) return;
+
+    setState(() {
+      _isAddingUser = true;
+    });
+
+    if (!mounted) return;
+
+    setState(() {
+      _assignees.add(user);
+      _selectedUser = null;
+      _foundUsers = [];
+      _assigneeSearchController.clear();
+      _isAddingUser = false;
+      _checkChanged();
+    });
+  }
+
+  void _removeAssignee(User user) {
+    setState(() {
+      _assignees.removeWhere((u) => u.id == user.id);
+      _checkChanged();
+    });
+  }
+
   void _checkChanged() {
     setState(() {
       var repeatAfterValue = getRepeatAfterValueFromDuration(
@@ -732,6 +1269,9 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
 
       var repeatAfter = repeatAfterType.getDuration(repeatAfterValue);
 
+      final assigneeIdsCurrent = widget.task.assignees.map((e) => e.id).toList()..sort();
+      final assigneeIdsEdited = _assignees.map((e) => e.id).toList()..sort();
+
       changed =
           widget.task.title != _title ||
           widget.task.description != _description ||
@@ -742,12 +1282,12 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
           widget.task.priority != _priority ||
           widget.task.reminderDates != _reminderDates ||
           widget.task.labels != _labels ||
-          widget.task.color != _color;
+          widget.task.color != _color ||
+          !const ListEquality<int>().equals(assigneeIdsCurrent, assigneeIdsEdited);
     });
   }
 
   Future<void> _saveTask(BuildContext context) async {
-    // Removes all reminders with no value set.
     _reminderDates?.removeWhere((d) => d.reminder == DateTime(0));
 
     final updatedTask =
@@ -757,15 +1297,14 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
             reminderDates: _reminderDates,
             priority: _priority,
             labels: _labels,
+            assignees: _assignees,
             repeatAfter: _repeatAfterUnit.getDuration(_repeatAfterValue),
           )
-          //Need to be here as they can be null
           ..dueDate = _dueDate
           ..startDate = _startDate
           ..endDate = _endDate
           ..color = _color;
 
-    // update the labels
     if (_labels != null) {
       var updateLabelSuccess = await ref
           .read(taskLabelBulkRepositoryProvider)

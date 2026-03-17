@@ -38,6 +38,11 @@ class UserRepositoryImpl extends UserRepository {
   }
 
   @override
+  Future<Response<List<User>>> searchUsers(String search) async {
+    return (await _dataSource.searchUsers(search)).toDomain();
+  }
+
+  @override
   Future<Response<UserSettings>> setCurrentUserSettings(
     UserSettings userSettings,
   ) async {

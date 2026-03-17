@@ -74,7 +74,7 @@ class Client {
   Map<String, String> get _headers => {
     'Authorization': _token != '' ? 'Bearer $_token' : '',
     'Content-Type': 'application/json',
-    'User-Agent': 'Vikunja Mobile App',
+    'User-Agent': 'Doneits Mobile App',
   };
 
   Map<String, String> get headers => _headers;

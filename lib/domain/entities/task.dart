@@ -24,6 +24,7 @@ class Task {
   List<Task> subtasks;
   List<Label> labels;
   List<TaskAttachment> attachments;
+  List<User> assignees;
 
   Task({
     this.id = 0,
@@ -44,6 +45,7 @@ class Task {
     this.subtasks = const [],
     this.labels = const [],
     this.attachments = const [],
+    this.assignees = const [],
     DateTime? created,
     DateTime? updated,
     required this.createdBy,
@@ -92,6 +94,7 @@ class Task {
     List<Task>? subtasks,
     List<Label>? labels,
     List<TaskAttachment>? attachments,
+    List<User>? assignees,
   }) {
     return Task(
       id: id ?? this.id,
@@ -117,6 +120,7 @@ class Task {
       subtasks: subtasks ?? this.subtasks,
       labels: labels ?? this.labels,
       attachments: attachments ?? this.attachments,
+      assignees: assignees ?? this.assignees,
     );
   }
 }

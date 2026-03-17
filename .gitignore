@@ -116,3 +116,6 @@ local.properties
 
 # pre-commit
 .pre-commit-config.yaml
+
+android/app/.cxx/
+.github/workflows/

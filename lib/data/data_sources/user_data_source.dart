@@ -70,6 +70,19 @@ class UserDataSource extends RemoteDataSource {
     );
   }
 
+Future<Response<List<UserDto>>> searchUsers(String search) {
+  return client.get(
+    url: '/users',
+    queryParameters: {
+      's': [search],
+    },
+    mapper: (body) {
+      return convertList(body, (result) => UserDto.fromJson(result));
+    },
+  );
+}
+
+
   Future<Response<UserSettingsDto>> setCurrentUserSettings(
     UserSettingsDto userSettings,
   ) async {

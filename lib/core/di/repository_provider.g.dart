@@ -227,5 +227,81 @@ final taskCommentRepositoryProvider =
 // ignore: unused_element
 typedef TaskCommentRepositoryRef =
     AutoDisposeProviderRef<TaskCommentRepository>;
+String _$teamRepositoryHash() => r'f63d128377d8d86f02c6f87147d2fdfa4145bcb8';
+
+/// See also [teamRepository].
+@ProviderFor(teamRepository)
+final teamRepositoryProvider = AutoDisposeProvider<TeamRepository>.internal(
+  teamRepository,
+  name: r'teamRepositoryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$teamRepositoryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TeamRepositoryRef = AutoDisposeProviderRef<TeamRepository>;
+String _$teamMemberRepositoryHash() =>
+    r'662f3fad3405e1a5b1ff9eacb0465d6a2ae9b6d1';
+
+/// See also [teamMemberRepository].
+@ProviderFor(teamMemberRepository)
+final teamMemberRepositoryProvider =
+    AutoDisposeProvider<TeamMemberRepository>.internal(
+      teamMemberRepository,
+      name: r'teamMemberRepositoryProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$teamMemberRepositoryHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TeamMemberRepositoryRef = AutoDisposeProviderRef<TeamMemberRepository>;
+String _$userProjectRepositoryHash() =>
+    r'30c6e648f6c6e9ccf79fbc941587f3d23563f5e0';
+
+/// See also [userProjectRepository].
+@ProviderFor(userProjectRepository)
+final userProjectRepositoryProvider =
+    AutoDisposeProvider<UserProjectRepository>.internal(
+      userProjectRepository,
+      name: r'userProjectRepositoryProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$userProjectRepositoryHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef UserProjectRepositoryRef =
+    AutoDisposeProviderRef<UserProjectRepository>;
+String _$teamProjectRepositoryHash() =>
+    r'82e7379829a4055e1077a9d46951e70f4cb24659';
+
+/// See also [teamProjectRepository].
+@ProviderFor(teamProjectRepository)
+final teamProjectRepositoryProvider =
+    AutoDisposeProvider<TeamProjectRepository>.internal(
+      teamProjectRepository,
+      name: r'teamProjectRepositoryProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$teamProjectRepositoryHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TeamProjectRepositoryRef =
+    AutoDisposeProviderRef<TeamProjectRepository>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

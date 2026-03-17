@@ -13,6 +13,7 @@ import 'package:vikunja_app/presentation/manager/project_controller.dart';
 import 'package:vikunja_app/presentation/pages/error_widget.dart';
 import 'package:vikunja_app/presentation/pages/loading_widget.dart';
 import 'package:vikunja_app/presentation/pages/project/project_edit.dart';
+import 'package:vikunja_app/presentation/pages/project/project_share_page.dart';
 import 'package:vikunja_app/presentation/widgets/project/kanban/kanban_widget.dart';
 import 'package:vikunja_app/presentation/widgets/project/project_task_list.dart';
 import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
@@ -93,17 +94,45 @@ class ProjectPageState extends ConsumerState<ProjectDetailPage> {
     return AppBar(
       title: Text(project.title),
       actions: <Widget>[
-        IconButton(
-          icon: Icon(Icons.edit),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProjectEditPage(
-                project: project,
-                displayDoneTask: displayDoneTask,
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'edit') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProjectEditPage(
+                    project: project,
+                    displayDoneTask: displayDoneTask,
+                  ),
+                ),
+              );
+            } else if (value == 'share') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProjectSharePage(project: project),
+                ),
+              );
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem<String>(
+              value: 'edit',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.edit_outlined),
+                title: Text('Edit'),
               ),
             ),
-          ),
+            PopupMenuItem<String>(
+              value: 'share',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.share_outlined),
+                title: Text('Share'),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -119,7 +148,7 @@ class ProjectPageState extends ConsumerState<ProjectDetailPage> {
     return Builder(
       builder: (context) => FloatingActionButton(
         onPressed: () => _addITaskDialog(context, project),
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -149,45 +178,44 @@ class ProjectPageState extends ConsumerState<ProjectDetailPage> {
     return showDialog(
       context: context,
       builder: (_) => AddTaskDialog(
-        onAddTask: (title, dueDate) =>
-            _addItem(context, project, title, dueDate),
+        projectId: project.id,
+        onAddTask: (taskDraft) => _addItem(context, project, taskDraft),
       ),
     );
   }
 
-  Future<void> _addItem(
-    BuildContext context,
-    Project project,
-    String title,
-    DateTime? dueDate,
-  ) async {
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null) {
-      return;
-    }
-
-    final task = Task(
-      title: title,
-      dueDate: dueDate,
-      createdBy: currentUser,
-      done: false,
-      projectId: project.id,
-    );
-
-    var success = await ref
-        .read(projectControllerProvider(widget.project).notifier)
-        .addTask(project, task);
-
-    if (context.mounted && success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).taskAddedSuccess)),
-      );
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).taskAddError)),
-      );
-    }
+  Future<(bool, String?)> _addItem(
+  BuildContext context,
+  Project project,
+  Task taskDraft,
+) async {
+  final currentUser = ref.read(currentUserProvider);
+  if (currentUser == null) {
+    return (false, 'No current user');
   }
+
+  final task = Task(
+    title: taskDraft.title,
+    dueDate: taskDraft.dueDate,
+    priority: taskDraft.priority,
+    color: taskDraft.color,
+    labels: taskDraft.labels,
+    assignees: taskDraft.assignees,
+    createdBy: currentUser,
+    done: false,
+    projectId: project.id,
+  );
+
+  final success = await ref
+      .read(projectControllerProvider(widget.project).notifier)
+      .addTask(project, task);
+
+  if (success) {
+    return (true, null);
+  }
+
+  return (false, 'No se pudo agregar la tarea');
+}
 
   void _onViewTapped(int index) {
     setState(() {

@@ -70,7 +70,7 @@ class NotificationHandler {
       FlutterLocalNotificationsPlugin();
 
   var androidSpecificsDueDate = AndroidNotificationDetails(
-    "Vikunja1",
+    "Doneits1",
     "Due Date Notifications",
     channelDescription: "description",
     icon: 'vikunja_notification_logo',
@@ -80,7 +80,7 @@ class NotificationHandler {
     ],
   );
   var androidSpecificsReminders = AndroidNotificationDetails(
-    "Vikunja2",
+    "Doneits2",
     "Reminder Notifications",
     channelDescription: "description",
     icon: 'vikunja_notification_logo',
@@ -228,7 +228,7 @@ class NotificationHandler {
             "This is your reminder for '${task.title}'",
             notificationsPlugin,
             reminder.reminder,
-            await FlutterTimezone.getLocalTimezone(),
+            (await FlutterTimezone.getLocalTimezone()).identifier,
             platformChannelSpecificsReminders,
           );
         }
@@ -239,7 +239,7 @@ class NotificationHandler {
             "The task '${task.title}' is due.",
             notificationsPlugin,
             task.dueDate!,
-            await FlutterTimezone.getLocalTimezone(),
+           (await FlutterTimezone.getLocalTimezone()).identifier,
             platformChannelSpecificsDueDate,
           );
         }

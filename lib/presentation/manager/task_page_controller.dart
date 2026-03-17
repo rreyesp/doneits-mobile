@@ -12,9 +12,15 @@ part 'task_page_controller.g.dart';
 
 @riverpod
 class TaskPageController extends _$TaskPageController {
+  bool _showCompletedTasks = false;
+
+  bool get showCompletedTasks => _showCompletedTasks;
+
   @override
   Future<TaskPageModel> build() async {
-    var tasksResponse = await _getAllFiltered();
+    final tasksResponse = await _getAllFiltered(
+      showCompletedTasks: _showCompletedTasks,
+    );
 
     switch (tasksResponse) {
       case SuccessResponse<List<Task>>():
@@ -27,11 +33,13 @@ class TaskPageController extends _$TaskPageController {
   }
 
   void reload() async {
-    var tasksResponse = await _getAllFiltered();
+    final tasksResponse = await _getAllFiltered(
+      showCompletedTasks: _showCompletedTasks,
+    );
 
     switch (tasksResponse) {
       case SuccessResponse<List<Task>>():
-        var pageModel = await _createPageModel(tasksResponse.body);
+        final pageModel = await _createPageModel(tasksResponse.body);
         state = AsyncData(pageModel);
       case ErrorResponse<List<Task>>():
         state = AsyncError(tasksResponse.error, StackTrace.current);
@@ -40,11 +48,16 @@ class TaskPageController extends _$TaskPageController {
     }
   }
 
+  void setShowCompletedTasks(bool newValue) {
+    _showCompletedTasks = newValue;
+    reload();
+  }
+
   Future<TaskPageModel> _createPageModel(List<Task> tasks) async {
-    var defaultProjectId =
+    final defaultProjectId =
         ref.read(currentUserProvider)?.settings?.defaultProjectId ?? 0;
 
-    var projectsResponse = await ref.read(projectRepositoryProvider).getAll();
+    final projectsResponse = await ref.read(projectRepositoryProvider).getAll();
 
     _setProjectOfTask(projectsResponse, tasks);
 
@@ -53,7 +66,7 @@ class TaskPageController extends _$TaskPageController {
         .read(notificationProvider)
         ?.scheduleDueNotifications(ref.read(taskRepositoryProvider));
 
-    var showOnlyDueDateTasks = await ref
+    final showOnlyDueDateTasks = await ref
         .read(settingsRepositoryProvider)
         .getLandingPageOnlyDueDateTasks();
 
@@ -65,51 +78,54 @@ class TaskPageController extends _$TaskPageController {
     List<Task> tasks,
   ) {
     if (projectsResponse.isSuccessful) {
-      var projectsMap = {
-        for (var v in projectsResponse.toSuccess().body) v.id: v,
+      final projectsMap = {
+        for (final v in projectsResponse.toSuccess().body) v.id: v,
       };
 
-      for (var tasks in tasks) {
-        tasks.project = projectsMap[tasks.projectId];
+      for (final task in tasks) {
+        task.project = projectsMap[task.projectId];
       }
     }
   }
 
-  Future<Response<List<Task>>> _getAllFiltered() async {
-    var showOnlyDueDateTasks = await ref
+  Future<Response<List<Task>>> _getAllFiltered({
+    required bool showCompletedTasks,
+  }) async {
+    final showOnlyDueDateTasks = await ref
         .read(settingsRepositoryProvider)
         .getLandingPageOnlyDueDateTasks();
 
-    var user = ref.read(currentUserProvider);
+    final user = ref.read(currentUserProvider);
     if (user != null) {
-      Map<String, dynamic>? frontendSettings = user.settings?.frontendSettings;
-      int? filterId = frontendSettings?["filter_id_used_on_overview"];
-      if (filterId != null && filterId != 0) {
-        var tasksResponse = await ref
-            .read(taskRepositoryProvider)
-            .getAllByProject(filterId, {
-              "sort_by": ["due_date", "id"],
-              "order_by": ["asc", "desc"],
-            });
+      final Map<String, dynamic>? frontendSettings =
+          user.settings?.frontendSettings;
+      final int? filterId = frontendSettings?["filter_id_used_on_overview"];
 
-        return tasksResponse;
+      if (filterId != null && filterId != 0) {
+        return await ref.read(taskRepositoryProvider).getAllByProject(filterId, {
+          "sort_by": ["done", "due_date", "id"],
+          "order_by": ["asc", "asc", "desc"],
+        });
       }
     }
 
-    List<String> filterStrings = ["done = false"];
+    final List<String> filterStrings = [];
+
+    if (!showCompletedTasks) {
+      filterStrings.add("done = false");
+    }
+
     if (showOnlyDueDateTasks) {
       filterStrings.add("due_date > 0001-01-01 00:00");
     }
 
-    var tasksResponse = await ref
-        .read(taskRepositoryProvider)
-        .getByFilterString(filterStrings.join(" && "), {
-          "sort_by": ["due_date", "id"],
-          "order_by": ["asc", "desc"],
-          "filter_include_nulls": ["false"],
-        });
+    final filter = filterStrings.isEmpty ? "" : filterStrings.join(" && ");
 
-    return tasksResponse;
+    return await ref.read(taskRepositoryProvider).getByFilterString(filter, {
+      "sort_by": ["done", "due_date", "id"],
+      "order_by": ["asc", "asc", "desc"],
+      "filter_include_nulls": ["false"],
+    });
   }
 
   Future<void> setLandingPageOnlyDueDateTasks(bool newValue) async {
@@ -120,23 +136,41 @@ class TaskPageController extends _$TaskPageController {
     reload();
   }
 
-  Future<bool> addTask(int projectId, Task task) async {
-    var response = await ref.read(taskRepositoryProvider).add(projectId, task);
-    if (response.isSuccessful) {
-      reload();
+  Future<(bool, String?)> addTaskWithMessage(int projectId, Task task) async {
+  final response = await ref.read(taskRepositoryProvider).add(projectId, task);
 
-      return true;
-    }
-
-    return false;
+  if (response.isSuccessful) {
+    reload();
+    return (true, null);
   }
 
+  if (response.isError) {
+    final error = response.toError().error;
+    final code = error['code'];
+
+    if (code == 7003) {
+      return (
+        false,
+        'Ese usuario no tiene permiso para el proyecto seleccionado. Elige otro proyecto.',
+      );
+    }
+
+    return (false, error['message']?.toString() ?? 'Error al agregar la tarea');
+  }
+
+  if (response.isException) {
+    return (false, response.toException().message);
+  }
+
+  return (false, 'No se pudo agregar la tarea');
+}
+
   Future<bool> deleteTask(int id) async {
-    var response = await ref.read(taskRepositoryProvider).delete(id);
+    final response = await ref.read(taskRepositoryProvider).delete(id);
     if (response.isSuccessful) {
-      var value = state.value;
+      final value = state.value;
       if (value != null) {
-        var tasks = value.tasks;
+        final tasks = List<Task>.from(value.tasks);
         tasks.removeWhere((element) => element.id == id);
         state = AsyncData(value.copyWith(tasks: tasks));
       }
@@ -148,25 +182,33 @@ class TaskPageController extends _$TaskPageController {
   }
 
   Future<bool> updateTask(Task task) async {
-    var response = await ref.read(taskRepositoryProvider).update(task);
+    final response = await ref.read(taskRepositoryProvider).update(task);
     if (response.isSuccessful) {
       reload();
-
       return true;
     }
 
     return false;
   }
 
-  Future<bool> markAsDone(Task task) async {
-    task.done = true;
-    var response = await ref.read(taskRepositoryProvider).update(task);
+  Future<bool> toggleDone(Task task, bool done) async {
+    task.done = done;
+
+    final response = await ref.read(taskRepositoryProvider).update(task);
     if (response.isSuccessful) {
-      var value = state.value;
-      if (value != null) {
-        var tasks = value.tasks;
-        tasks.removeWhere((element) => element.id == task.id);
-        state = AsyncData(value.copyWith(tasks: tasks));
+      if (_showCompletedTasks) {
+        reload();
+      } else {
+        final value = state.value;
+        if (value != null) {
+          final tasks = List<Task>.from(value.tasks);
+
+          if (done) {
+            tasks.removeWhere((element) => element.id == task.id);
+          }
+
+          state = AsyncData(value.copyWith(tasks: tasks));
+        }
       }
 
       return true;

@@ -18,7 +18,9 @@ import 'package:vikunja_app/presentation/manager/settings_controller.dart';
 import 'package:vikunja_app/presentation/manager/task_page_controller.dart';
 import 'package:vikunja_app/presentation/pages/project/project_list_page.dart';
 import 'package:vikunja_app/presentation/pages/settings_page.dart';
+import 'package:vikunja_app/presentation/pages/task/assigned_page.dart';
 import 'package:vikunja_app/presentation/pages/task/task_list_page.dart';
+import 'package:vikunja_app/presentation/pages/team/team_list_page.dart';
 import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -35,19 +37,33 @@ class HomePageState extends ConsumerState<HomePage> {
   Widget? drawerItem;
   NotificationHandler? _notificationHandler;
 
-  List<Widget> widgets = [TaskListPage(), ProjectListPage(), SettingsPage()];
+  late final List<Widget> widgets = const [
+    TaskListPage(),
+    AssignedPage(),
+    ProjectListPage(),
+    TeamListPage(),
+    SettingsPage(),
+  ];
 
   List<NavigationDestination> navbarItems(BuildContext context) => [
     NavigationDestination(
-      icon: Icon(Icons.home),
+      icon: const Icon(Icons.home),
       label: AppLocalizations.of(context).homeTab,
     ),
-    NavigationDestination(
-      icon: Icon(Icons.list),
-      label: AppLocalizations.of(context).projectsTab,
+    const NavigationDestination(
+      icon: Icon(Icons.assignment_ind_outlined),
+      label: 'Assigned',
     ),
     NavigationDestination(
-      icon: Icon(Icons.settings),
+      icon: const Icon(Icons.list),
+      label: AppLocalizations.of(context).projectsTab,
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.group_outlined),
+      label: 'Teams',
+    ),
+    NavigationDestination(
+      icon: const Icon(Icons.settings),
       label: AppLocalizations.of(context).settingsTab,
     ),
   ];
@@ -75,7 +91,6 @@ class HomePageState extends ConsumerState<HomePage> {
   @override
   void dispose() {
     _notificationHandler?.removeListener(onNotificationDone);
-
     super.dispose();
   }
 
@@ -87,7 +102,7 @@ class HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       bottomNavigationBar: ClipRRect(
-        borderRadius: BorderRadius.only(
+        borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(16),
           topRight: Radius.circular(16),
         ),
@@ -113,7 +128,6 @@ class HomePageState extends ConsumerState<HomePage> {
   void scheduleIntent() async {
     try {
       String? argument = await platform.invokeMethod<String>("isQuickTile", "");
-
       return showAddItemDialog(argument);
     } catch (e) {
       developer.log("Error $e");
@@ -128,11 +142,8 @@ class HomePageState extends ConsumerState<HomePage> {
     var response = await ref.read(userRepositoryProvider).getCurrentUser();
     var buildContext = context;
     if (response.isSuccessful && buildContext.mounted) {
-      var defaultProjectId = response
-          .toSuccess()
-          .body
-          .settings
-          ?.defaultProjectId;
+      var defaultProjectId =
+          response.toSuccess().body.settings?.defaultProjectId;
       if (defaultProjectId == null || defaultProjectId == 0) {
         ScaffoldMessenger.of(buildContext).showSnackBar(
           SnackBar(
@@ -156,48 +167,40 @@ class HomePageState extends ConsumerState<HomePage> {
     showDialog(
       context: context,
       builder: (_) => AddTaskDialog(
-        onAddTask: (title, dueDate) =>
-            _addTask(title, dueDate, defaultProjectId, context),
+        projectId: defaultProjectId,
         title: title,
+        onAddTask: (taskDraft) =>
+            _addTask(taskDraft, defaultProjectId, context),
       ),
     );
   }
 
-  Future<void> _addTask(
-    String title,
-    DateTime? dueDate,
+  Future<(bool, String?)> _addTask(
+    Task taskDraft,
     int defaultProjectId,
     BuildContext context,
   ) async {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) {
-      return;
+      return (false, 'No current user');
     }
 
-    var task = Task(
-      title: title,
-      dueDate: dueDate,
+    final effectiveProjectId = taskDraft.projectId ?? defaultProjectId;
+
+    final task = Task(
+      title: taskDraft.title,
+      dueDate: taskDraft.dueDate,
+      priority: taskDraft.priority,
+      color: taskDraft.color,
+      labels: taskDraft.labels,
+      assignees: taskDraft.assignees,
       createdBy: currentUser,
-      projectId: defaultProjectId,
+      projectId: effectiveProjectId,
     );
 
-    var success = await ref
+    return await ref
         .read(taskPageControllerProvider.notifier)
-        .addTask(defaultProjectId, task);
-
-    if (context.mounted) {
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).taskAddedSuccess),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).taskAddError)),
-        );
-      }
-    }
+        .addTaskWithMessage(effectiveProjectId, task);
   }
 
   Future<void> postVersionCheckSnackbar() async {

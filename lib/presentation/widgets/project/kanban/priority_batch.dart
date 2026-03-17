@@ -10,47 +10,37 @@ class PriorityBatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context);
-    return Badge(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      label: Text(priorityToString(loc, priority)),
-      backgroundColor: getBackgroundColor(context, priority),
+    final color = _priorityColor(priority);
+
+    if (color == Colors.transparent) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      width: 16,
+      height: 16,
+      child: Center(
+        child: Icon(
+          Icons.push_pin,
+          size: 14,
+          color: color,
+        ),
+      ),
     );
   }
 
-  Color? getBackgroundColor(BuildContext context, int priority) {
-    final appColors = Theme.of(context).extension<AppColors>();
+  Color _priorityColor(int priority) {
     switch (priority) {
-      case 0:
-        return null;
       case 1:
-        return appColors?.success ?? Colors.green;
+        return const Color(0xFFBDBDBD);
       case 2:
-        return appColors?.warning ?? Colors.yellow;
+        return Colors.orange;
       case 3:
       case 4:
       case 5:
-        return appColors?.danger ?? Colors.red;
+        return Colors.red;
       default:
-        return null;
-    }
-  }
-
-  Color? getTextColor(BuildContext context, int priority) {
-    final appColors = Theme.of(context).extension<AppColors>();
-    switch (priority) {
-      case 0:
-        return null;
-      case 1:
-        return appColors?.onSuccess ?? Colors.green;
-      case 2:
-        return appColors?.onWarning ?? Colors.yellow;
-      case 3:
-      case 4:
-      case 5:
-        return appColors?.onDanger ?? Colors.red;
-      default:
-        return null;
+        return Colors.transparent;
     }
   }
 }

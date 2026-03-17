@@ -5,19 +5,47 @@ import 'package:vikunja_app/core/network/remote_data_source.dart';
 import 'package:vikunja_app/core/network/response.dart';
 import 'package:vikunja_app/data/models/task_attachment_dto.dart';
 import 'package:vikunja_app/data/models/task_dto.dart';
+import 'package:flutter/foundation.dart';
 
 class TaskDataSource extends RemoteDataSource {
   TaskDataSource(super.client);
 
-  Future<Response<TaskDto>> add(int projectId, TaskDto task) {
-    return client.put(
-      url: '/projects/$projectId/tasks',
-      body: task.toJSON(),
-      mapper: (body) {
-        return TaskDto.fromJson(body);
-      },
-    );
-  }
+Future<Response<TaskDto>> add(int projectId, TaskDto task) {
+  final body = task.toJSON();
+
+  debugPrint('========== TASK CREATE BODY ==========');
+  debugPrint(body.toString());
+  debugPrint('=====================================');
+
+  return client.put(
+    url: '/projects/$projectId/tasks',
+    body: body,
+    mapper: (responseBody) {
+      debugPrint('======= TASK CREATE RESPONSE =======');
+      debugPrint(responseBody.toString());
+      debugPrint('===================================');
+      return TaskDto.fromJson(responseBody);
+    },
+  );
+}
+
+Future<Response<void>> addAssignee(int taskId, int userId) async {
+  debugPrint('====== ADD ASSIGNEE REQUEST ======');
+  debugPrint('taskId: $taskId, userId: $userId');
+
+  return client.put(
+    url: '/tasks/$taskId/assignees',
+    body: {
+      'user_id': userId,
+    },
+  );
+}
+
+Future<Response<void>> deleteAssignee(int taskId, int userId) async {
+  return client.delete(
+    url: '/tasks/$taskId/assignees/$userId',
+  );
+}
 
   Future<Response<Object>> delete(int taskId) async {
     return client.delete(url: '/tasks/$taskId');

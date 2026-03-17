@@ -20,12 +20,12 @@ dependencies:
   dynamic_color: ^1.7.0
   flutter_colorpicker: ^1.1.0
   flutter_lints: ^6.0.0
-  flutter_local_notifications: ^20.0.0
+  flutter_local_notifications: ^21.0.0-dev.2
   flutter_riverpod: ^2.6.1
   flutter_secure_storage: ^10.0.0
-  flutter_timezone: ^4.1.0
+  flutter_timezone: ^5.0.1
   flutter_widget_from_html: ^0.17.1
-  home_widget: ^0.8.0
+  home_widget: ^0.9.0
   html_editor_enhanced: ^2.6.0
   http: ^1.6.0
   intl: ^0.20.2
@@ -36,7 +36,7 @@ dependencies:
   riverpod_annotation: ^2.6.1
   sentry_flutter: ^9.6.0
   sentry_logging: ^9.6.0
-  timezone: ^0.10.0
+  timezone: ^0.11.0
   url_launcher: ^6.2.5
   webview_flutter: ^4.7.0
   workmanager: ^0.9.0
@@ -44,20 +44,19 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-    version: any
-  build_runner: ^2.5.4
-  custom_lint: ^0.7.6
-  flutter_launcher_icons: ^0.14.3
+  build_runner: ^2.4.8
+  custom_lint: ^0.7.0
+  flutter_launcher_icons: ^0.13.1
   riverpod_generator: ^2.6.5
-  riverpod_lint: ^2.6.5
+  riverpod_lint: ^2.6.3
 
 flutter_icons:
-  image_path: "assets/vikunja_logo.png"
-  image_path_ios: "assets/vikunja_ios.png"
+  image_path: "assets/branding/icon.png"
+  image_path_ios: "assets/branding/ios_icon.png"
   android: true
   ios: true
-  adaptive_icon_background: "#FF455486"
-  adaptive_icon_foreground: "assets/vikunja_logo_adaptive.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"
 
 flutter:
   default-flavor: unsigned
@@ -65,6 +64,8 @@ flutter:
   generate: true
   assets:
     - assets/graphics/hypnotize.png
+    - assets/branding/icon.png
+    - assets/branding/icon_foreground.png
     - assets/vikunja_logo.png
     - assets/vikunja_logo_full.png
     - assets/vikunja_logo_full_white.png
@@ -72,3 +73,4 @@ flutter:
     - family: Quicksand
       fonts:
         - asset: assets/fonts/quicksand-v7-latin-regular.ttf
+

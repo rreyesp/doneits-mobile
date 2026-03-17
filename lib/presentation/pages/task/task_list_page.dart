@@ -21,12 +21,19 @@ class TaskListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    var pageModel = ref.watch(taskPageControllerProvider);
+    final pageModel = ref.watch(taskPageControllerProvider);
+    final showCompletedTasks =
+        ref.read(taskPageControllerProvider.notifier).showCompletedTasks;
 
     return pageModel.when(
       data: (model) {
         return Scaffold(
-          appBar: _buildAppBar(ref, context, model.onlyDueDate),
+          appBar: _buildAppBar(
+            ref,
+            context,
+            model.onlyDueDate,
+            showCompletedTasks,
+          ),
           body: RefreshIndicator(
             onRefresh: () async {
               ref.read(taskPageControllerProvider.notifier).reload();
@@ -55,41 +62,62 @@ class TaskListPage extends ConsumerWidget {
   Widget _buildList(WidgetRef ref, BuildContext context, TaskPageModel model) {
     if (model.tasks.isEmpty) {
       return EmptyView(Icons.list, AppLocalizations.of(context).noTasks);
-    } else {
-      return ListView(
-        children: ListTile.divideTiles(
-          context: context,
-          tiles: _listTasks(ref, context, model.tasks),
-        ).toList(),
-      );
     }
+
+    return ListView(
+      children: ListTile.divideTiles(
+        context: context,
+        tiles: _listTasks(ref, context, model.tasks),
+      ).toList(),
+    );
   }
 
-  AppBar _buildAppBar(WidgetRef ref, BuildContext context, bool onlyDueDate) {
+  AppBar _buildAppBar(
+    WidgetRef ref,
+    BuildContext context,
+    bool onlyDueDate,
+    bool showCompletedTasks,
+  ) {
     return AppBar(
-      title: Text("Vikunja"),
+      title: Text(AppLocalizations.of(context)!.appName),
       actions: [
-        PopupMenuButton(
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'toggle_due_date') {
+              Future.microtask(() {
+                _onlyDueDateChanged(ref, !onlyDueDate);
+              });
+            } else if (value == 'toggle_completed') {
+              Future.microtask(() {
+                ref
+                    .read(taskPageControllerProvider.notifier)
+                    .setShowCompletedTasks(!showCompletedTasks);
+              });
+            }
+          },
           itemBuilder: (BuildContext context) {
             return [
-              PopupMenuItem(
-                child: InkWell(
-                  onTap: () {
-                    _onlyDueDateChanged(ref, context, !onlyDueDate);
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        AppLocalizations.of(context).onlyShowTasksWithDueDate,
-                      ),
-                      Checkbox(
-                        value: onlyDueDate,
-                        onChanged: (bool? value) {
-                          _onlyDueDateChanged(ref, context, !onlyDueDate);
-                        },
-                      ),
-                    ],
+              CheckedPopupMenuItem<String>(
+                value: 'toggle_due_date',
+                checked: onlyDueDate,
+                child: SizedBox(
+                  width: 220,
+                  child: Text(
+                    AppLocalizations.of(context).onlyShowTasksWithDueDate,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              CheckedPopupMenuItem<String>(
+                value: 'toggle_completed',
+                checked: showCompletedTasks,
+                child: const SizedBox(
+                  width: 220,
+                  child: Text(
+                    'Show completed tasks',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
@@ -100,8 +128,7 @@ class TaskListPage extends ConsumerWidget {
     );
   }
 
-  void _onlyDueDateChanged(WidgetRef ref, BuildContext context, bool newValue) {
-    Navigator.pop(context);
+  void _onlyDueDateChanged(WidgetRef ref, bool newValue) {
     ref
         .read(taskPageControllerProvider.notifier)
         .setLandingPageOnlyDueDateTasks(newValue);
@@ -115,50 +142,41 @@ class TaskListPage extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (_) => AddTaskDialog(
-        onAddTask: (title, dueDate) =>
-            _addTask(ref, title, dueDate, defaultProjectId),
+        projectId: defaultProjectId,
+        onAddTask: (taskDraft) => _addTask(ref, taskDraft, defaultProjectId),
       ),
     );
   }
 
-  Future<void> _addTask(
-    WidgetRef ref,
-    String title,
-    DateTime? dueDate,
-    int defaultProjectId,
-  ) async {
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null) {
-      return;
-    }
-
-    var task = Task(
-      title: title,
-      dueDate: dueDate,
-      createdBy: currentUser,
-      projectId: defaultProjectId,
-    );
-
-    var success = await ref
-        .read(taskPageControllerProvider.notifier)
-        .addTask(defaultProjectId, task);
-
-    if (ref.context.mounted) {
-      if (success) {
-        ScaffoldMessenger.of(ref.context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(ref.context).taskAddedSuccess),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(ref.context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(ref.context).taskAddError),
-          ),
-        );
-      }
-    }
+  Future<(bool, String?)> _addTask(
+  WidgetRef ref,
+  Task taskDraft,
+  int defaultProjectId,
+) async {
+  final currentUser = ref.read(currentUserProvider);
+  if (currentUser == null) {
+    return (false, 'No current user');
   }
+
+  final effectiveProjectId = taskDraft.projectId ?? defaultProjectId;
+
+  final task = Task(
+    title: taskDraft.title,
+    dueDate: taskDraft.dueDate,
+    priority: taskDraft.priority,
+    color: taskDraft.color,
+    labels: taskDraft.labels,
+    assignees: taskDraft.assignees,
+    createdBy: currentUser,
+    projectId: effectiveProjectId,
+  );
+
+  return await ref
+      .read(taskPageControllerProvider.notifier)
+      .addTaskWithMessage(effectiveProjectId, task);
+}
+
+    
 
   List<Widget> _listTasks(
     WidgetRef ref,
@@ -173,11 +191,17 @@ class TaskListPage extends ConsumerWidget {
             onTap: () {
               _showTaskBottomSheet(context, task);
             },
+            onLongPress: () {
+              if (task.done) {
+                _showCompletedTaskOptions(context, ref, task);
+              }
+            },
             onEdit: () => _onEdit(context, task),
             onCheckedChanged: (value) async {
-              var success = await ref
+              final success = await ref
                   .read(taskPageControllerProvider.notifier)
-                  .markAsDone(task);
+                  .toggleDone(task, value);
+
               if (!success && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -196,13 +220,52 @@ class TaskListPage extends ConsumerWidget {
   void _showTaskBottomSheet(BuildContext context, Task task) {
     showModalBottomSheet<void>(
       context: context,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(10.0)),
       ),
       builder: (BuildContext context) {
         return TaskBottomSheet(
           task: task,
           onEdit: () => _onEdit(context, task),
+        );
+      },
+    );
+  }
+
+  void _showCompletedTaskOptions(
+    BuildContext context,
+    WidgetRef ref,
+    Task task,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (bottomSheetContext) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.undo),
+                title: const Text('Undone'),
+                onTap: () async {
+                  Navigator.pop(bottomSheetContext);
+
+                  final success = await ref
+                      .read(taskPageControllerProvider.notifier)
+                      .toggleDone(task, false);
+
+                  if (!success && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          AppLocalizations.of(context).taskMarkDoneError,
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
         );
       },
     );

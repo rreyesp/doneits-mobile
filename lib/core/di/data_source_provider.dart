@@ -12,7 +12,11 @@ import 'package:vikunja_app/data/data_sources/task_comment_data_source.dart';
 import 'package:vikunja_app/data/data_sources/task_data_source.dart';
 import 'package:vikunja_app/data/data_sources/task_label_bulk_data_source.dart';
 import 'package:vikunja_app/data/data_sources/task_label_data_source.dart';
+import 'package:vikunja_app/data/data_sources/team_data_source.dart';
+import 'package:vikunja_app/data/data_sources/team_member_data_source.dart';
+import 'package:vikunja_app/data/data_sources/team_project_data_source.dart';
 import 'package:vikunja_app/data/data_sources/user_data_source.dart';
+import 'package:vikunja_app/data/data_sources/user_project_data_source.dart';
 import 'package:vikunja_app/data/data_sources/version_data_source.dart';
 
 part 'data_source_provider.g.dart';
@@ -85,4 +89,28 @@ VersionDataSource versionDataSource(Ref ref) {
 TaskCommentDataSource taskCommentDataSource(Ref ref) {
   final client = ref.watch(clientProviderProvider);
   return TaskCommentDataSource(client);
+}
+
+@riverpod
+TeamDataSource teamDataSource(Ref ref) {
+  final client = ref.watch(clientProviderProvider);
+  return TeamDataSource(client);
+}
+
+@riverpod
+TeamMemberDataSource teamMemberDataSource(Ref ref) {
+  final client = ref.watch(clientProviderProvider);
+  return TeamMemberDataSource(client);
+}
+
+@riverpod
+UserProjectDataSource userProjectDataSource(Ref ref) {
+  final client = ref.watch(clientProviderProvider);
+  return UserProjectDataSource(client);
+}
+
+@riverpod
+TeamProjectDataSource teamProjectDataSource(Ref ref) {
+  final client = ref.watch(clientProviderProvider);
+  return TeamProjectDataSource(client);
 }

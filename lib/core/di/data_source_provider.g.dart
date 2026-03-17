@@ -225,5 +225,81 @@ final taskCommentDataSourceProvider =
 // ignore: unused_element
 typedef TaskCommentDataSourceRef =
     AutoDisposeProviderRef<TaskCommentDataSource>;
+String _$teamDataSourceHash() => r'a14e30f3ec5a5c1a51dffb87e649009291b6ca84';
+
+/// See also [teamDataSource].
+@ProviderFor(teamDataSource)
+final teamDataSourceProvider = AutoDisposeProvider<TeamDataSource>.internal(
+  teamDataSource,
+  name: r'teamDataSourceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$teamDataSourceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TeamDataSourceRef = AutoDisposeProviderRef<TeamDataSource>;
+String _$teamMemberDataSourceHash() =>
+    r'2c6943af0fcf468c69aee979ef19ed86be06a715';
+
+/// See also [teamMemberDataSource].
+@ProviderFor(teamMemberDataSource)
+final teamMemberDataSourceProvider =
+    AutoDisposeProvider<TeamMemberDataSource>.internal(
+      teamMemberDataSource,
+      name: r'teamMemberDataSourceProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$teamMemberDataSourceHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TeamMemberDataSourceRef = AutoDisposeProviderRef<TeamMemberDataSource>;
+String _$userProjectDataSourceHash() =>
+    r'aebc5abd8a3c38eb3ce2189df91f3dfda987bbbd';
+
+/// See also [userProjectDataSource].
+@ProviderFor(userProjectDataSource)
+final userProjectDataSourceProvider =
+    AutoDisposeProvider<UserProjectDataSource>.internal(
+      userProjectDataSource,
+      name: r'userProjectDataSourceProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$userProjectDataSourceHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef UserProjectDataSourceRef =
+    AutoDisposeProviderRef<UserProjectDataSource>;
+String _$teamProjectDataSourceHash() =>
+    r'66061e435480d6bde7a708bb6a601be788e4347a';
+
+/// See also [teamProjectDataSource].
+@ProviderFor(teamProjectDataSource)
+final teamProjectDataSourceProvider =
+    AutoDisposeProvider<TeamProjectDataSource>.internal(
+      teamProjectDataSource,
+      name: r'teamProjectDataSourceProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$teamProjectDataSourceHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef TeamProjectDataSourceRef =
+    AutoDisposeProviderRef<TeamProjectDataSource>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

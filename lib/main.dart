@@ -129,7 +129,7 @@ class VikunjaApp extends ConsumerWidget {
         final localeState = ref.watch(localeOverrideProvider);
         final overrideLocale = localeState.asData?.value;
         return MaterialApp(
-          title: 'Vikunja',
+          title: 'Doneits',
           theme: currentAppTheme?.getTheme(lightDynamic),
           darkTheme: currentAppTheme?.getDarkTheme(darkDynamic),
           themeMode: currentAppTheme?.getThemeMode(),

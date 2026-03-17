@@ -11,6 +11,10 @@ import 'package:vikunja_app/data/repositories/task_comment_repository_impl.dart'
 import 'package:vikunja_app/data/repositories/task_label_bulk_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/task_label_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/task_repository_impl.dart';
+import 'package:vikunja_app/data/repositories/team_member_repository_impl.dart';
+import 'package:vikunja_app/data/repositories/team_project_repository_impl.dart';
+import 'package:vikunja_app/data/repositories/team_repository_impl.dart';
+import 'package:vikunja_app/data/repositories/user_project_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/user_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/version_repository_impl.dart';
 import 'package:vikunja_app/domain/repositories/bucket_repository.dart';
@@ -21,6 +25,10 @@ import 'package:vikunja_app/domain/repositories/settings_repository.dart';
 import 'package:vikunja_app/domain/repositories/task_comment_repository.dart';
 import 'package:vikunja_app/domain/repositories/task_label_bulk_repository.dart';
 import 'package:vikunja_app/domain/repositories/task_repository.dart';
+import 'package:vikunja_app/domain/repositories/team_member_repository.dart';
+import 'package:vikunja_app/domain/repositories/team_project_repository.dart';
+import 'package:vikunja_app/domain/repositories/team_repository.dart';
+import 'package:vikunja_app/domain/repositories/user_project_repository.dart';
 import 'package:vikunja_app/domain/repositories/user_repository.dart';
 import 'package:vikunja_app/domain/repositories/version_repository.dart';
 
@@ -96,4 +104,28 @@ VersionRepository versionRepository(Ref ref) {
 TaskCommentRepository taskCommentRepository(Ref ref) {
   var taskCommentDataSource = ref.watch(taskCommentDataSourceProvider);
   return TaskCommentRepositoryImpl(taskCommentDataSource);
+}
+
+@riverpod
+TeamRepository teamRepository(Ref ref) {
+  var teamDataSource = ref.watch(teamDataSourceProvider);
+  return TeamRepositoryImpl(teamDataSource);
+}
+
+@riverpod
+TeamMemberRepository teamMemberRepository(Ref ref) {
+  var teamMemberDataSource = ref.watch(teamMemberDataSourceProvider);
+  return TeamMemberRepositoryImpl(teamMemberDataSource);
+}
+
+@riverpod
+UserProjectRepository userProjectRepository(Ref ref) {
+  var userProjectDataSource = ref.watch(userProjectDataSourceProvider);
+  return UserProjectRepositoryImpl(userProjectDataSource);
+}
+
+@riverpod
+TeamProjectRepository teamProjectRepository(Ref ref) {
+  var teamProjectDataSource = ref.watch(teamProjectDataSourceProvider);
+  return TeamProjectRepositoryImpl(teamProjectDataSource);
 }

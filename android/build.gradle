@@ -1,14 +1,16 @@
 allprojects {
     repositories {
         google()
+        maven { url "https://storage.googleapis.com/download.flutter.io" }
         mavenCentral()
     }
 }
 
-
 rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
     project.evaluationDependsOn(':app')
 }
 

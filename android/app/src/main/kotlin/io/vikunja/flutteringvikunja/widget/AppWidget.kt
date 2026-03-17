@@ -1,7 +1,5 @@
 package io.vikunja.flutteringvikunja.widget
 
-import HomeWidgetGlanceState
-import HomeWidgetGlanceStateDefinition
 import android.content.Context
 import android.content.SharedPreferences
 import android.text.format.DateFormat
@@ -42,7 +40,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Date
 import java.util.Locale
-
+import es.antonborri.home_widget.HomeWidgetGlanceState
+import es.antonborri.home_widget.HomeWidgetGlanceStateDefinition
 
 class AppWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Single

@@ -40,7 +40,8 @@ class LoginPageState extends ConsumerState<LoginPage> {
   bool init = false;
   List<String> pastServers = [];
 
-  final _serverController = TextEditingController();
+  // AQUÍ ESTÁ EL PRIMER CAMBIO: Inyectamos tu servidor por defecto
+  final _serverController = TextEditingController(text: 'https://doneits.com');
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -101,7 +102,7 @@ class LoginPageState extends ConsumerState<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               _buildLogo(),
-              _buildServerInput(),
+              // AQUÍ ESTÁ EL SEGUNDO CAMBIO: Eliminamos _buildServerInput() de la pantalla
               _buildUserInput(),
               _buildPasswordInput(),
               Padding(
@@ -507,17 +508,18 @@ class LoginPageState extends ConsumerState<LoginPage> {
     if (currentUser.isSuccessful) {
       ref.read(currentUserProvider.notifier).set(currentUser.toSuccess().body);
 
-      if (serverVersion != null &&
-          serverVersion != supportedServerVersion &&
-          context.mounted) {
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return VersionMismatchDialog(serverVersion: serverVersion);
-          },
-        );
-      }
+     if (serverVersion != null &&
+    serverVersion.toString().split('-').first !=
+        supportedServerVersion.toString().split('-').first &&
+    context.mounted) {
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return VersionMismatchDialog(serverVersion: serverVersion);
+    },
+  );
+}
 
       if (context.mounted) {
         Navigator.pushReplacementNamed(context, "/home");

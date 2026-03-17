@@ -23,7 +23,6 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
-
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
@@ -33,7 +32,8 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace 'io.vikunja.flutteringvikunja'
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -43,6 +43,7 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17
+        freeCompilerArgs += "-Xwhen-guards"
     }
 
     defaultConfig {
@@ -52,6 +53,9 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
     }
 
     signingConfigs {
@@ -91,15 +95,14 @@ android {
             //signingConfig signingConfigs.debug
         }
     }
+
     lint {
         disable 'InvalidPackage'
     }
 
-
     buildFeatures {
         compose true
     }
-
 }
 
 flutter {
@@ -111,4 +114,5 @@ dependencies {
     implementation "androidx.glance:glance:1.1.1"
     implementation "androidx.glance:glance-appwidget:1.1.1"
     implementation 'com.google.code.gson:gson:2.8.5'
+    implementation project(':home_widget')
 }
