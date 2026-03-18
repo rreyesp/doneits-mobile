@@ -1,38 +1,36 @@
-import 'dart:async';
+Future<void> _addSelectedUser() async {
+  final user = _selectedUser;
+  if (user == null) return;
 
-import 'package:background_downloader/background_downloader.dart'
-    show TaskStatusUpdate;
-import 'package:vikunja_app/core/network/response.dart';
-import 'package:vikunja_app/domain/entities/task.dart';
-import 'package:vikunja_app/domain/entities/task_attachment.dart';
+  setState(() {
+    _isAddingUser = true;
+  });
 
-abstract class TaskRepository {
-  Future<Response<Task>> add(int projectId, Task task);
+  final result = await ref
+      .read(taskPageControllerProvider.notifier)
+      .addAssigneeToTask(widget.task.id, user);
 
-  Future delete(int taskId);
+  if (!mounted) return;
 
-  Future<Response<Task>> update(Task task);
+  setState(() {
+    _isAddingUser = false;
+  });
 
-  Future<Response<Task>> getTask(int id);
+  if (result.$1) {
+    setState(() {
+      _assignees.add(user);
+      _selectedUser = null;
+      _foundUsers = [];
+      _assigneeSearchController.clear();
+    });
+    return;
+  }
 
-  Future<Response<List<Task>>> getAllByProject(
-    int projectId, [
-    Map<String, List<String>>? queryParameters,
-  ]);
-
-  Future<Response<List<Task>>> getAllByProjectView(
-    int projectId,
-    int view, [
-    Map<String, List<String>>? queryParameters,
-  ]);
-
-  Future<Response<List<Task>>> getByFilterString(
-    String filterString, [
-    Map<String, List<String>>? queryParameters,
-  ]);
-
-  Future<TaskStatusUpdate> downloadAttachment(
-    int taskId,
-    TaskAttachment attachment,
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        result.$2 ?? 'No se pudo asignar el usuario a la tarea',
+      ),
+    ),
   );
 }

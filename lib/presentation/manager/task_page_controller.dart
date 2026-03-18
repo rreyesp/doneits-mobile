@@ -6,6 +6,7 @@ import 'package:vikunja_app/core/network/response.dart';
 import 'package:vikunja_app/domain/entities/project.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/entities/task_page_model.dart';
+import 'package:vikunja_app/domain/entities/user.dart';
 import 'package:vikunja_app/presentation/manager/widget_controller.dart';
 
 part 'task_page_controller.g.dart';
@@ -137,33 +138,33 @@ class TaskPageController extends _$TaskPageController {
   }
 
   Future<(bool, String?)> addTaskWithMessage(int projectId, Task task) async {
-  final response = await ref.read(taskRepositoryProvider).add(projectId, task);
+    final response = await ref.read(taskRepositoryProvider).add(projectId, task);
 
-  if (response.isSuccessful) {
-    reload();
-    return (true, null);
-  }
-
-  if (response.isError) {
-    final error = response.toError().error;
-    final code = error['code'];
-
-    if (code == 7003) {
-      return (
-        false,
-        'Ese usuario no tiene permiso para el proyecto seleccionado. Elige otro proyecto.',
-      );
+    if (response.isSuccessful) {
+      reload();
+      return (true, null);
     }
 
-    return (false, error['message']?.toString() ?? 'Error al agregar la tarea');
-  }
+    if (response.isError) {
+      final error = response.toError().error;
+      final code = error['code'];
 
-  if (response.isException) {
-    return (false, response.toException().message);
-  }
+      if (code == 7003) {
+        return (
+          false,
+          'Ese usuario no tiene permiso para el proyecto seleccionado. Elige otro proyecto.',
+        );
+      }
 
-  return (false, 'No se pudo agregar la tarea');
-}
+      return (false, error['message']?.toString() ?? 'Error al agregar la tarea');
+    }
+
+    if (response.isException) {
+      return (false, response.toException().message);
+    }
+
+    return (false, 'No se pudo agregar la tarea');
+  }
 
   Future<bool> deleteTask(int id) async {
     final response = await ref.read(taskRepositoryProvider).delete(id);
@@ -183,6 +184,53 @@ class TaskPageController extends _$TaskPageController {
 
   Future<bool> updateTask(Task task) async {
     final response = await ref.read(taskRepositoryProvider).update(task);
+    if (response.isSuccessful) {
+      reload();
+      return true;
+    }
+
+    return false;
+  }
+
+  Future<(bool, String?)> addAssigneeToTask(int taskId, User user) async {
+    final response = await ref
+        .read(taskRepositoryProvider)
+        .addAssignee(taskId, user.id);
+
+    if (response.isSuccessful) {
+      reload();
+      return (true, null);
+    }
+
+    if (response.isError) {
+      final error = response.toError().error;
+      final code = error['code'];
+
+      if (code == 7003) {
+        return (
+          false,
+          'Ese usuario no tiene acceso al proyecto de esta tarea.',
+        );
+      }
+
+      return (
+        false,
+        error['message']?.toString() ?? 'No se pudo asignar el usuario',
+      );
+    }
+
+    if (response.isException) {
+      return (false, response.toException().message);
+    }
+
+    return (false, 'No se pudo asignar el usuario');
+  }
+
+  Future<bool> removeAssigneeFromTask(int taskId, User user) async {
+    final response = await ref
+        .read(taskRepositoryProvider)
+        .removeAssignee(taskId, user.id);
+
     if (response.isSuccessful) {
       reload();
       return true;
