@@ -94,31 +94,37 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
 
   bool changed = false;
 
+  Task? _freshTask;
+  bool _isLoadingTask = false;
+
   @override
-  void initState() {
-    _reminderDates = List.of(widget.task.reminderDates);
-    _labels = List.of(widget.task.labels);
-    _assignees = List.of(widget.task.assignees);
+void initState() {
+  _reminderDates = List.of(widget.task.reminderDates);
+  _labels = List.of(widget.task.labels);
+  _assignees = List.of(widget.task.assignees);
 
-    _priority = widget.task.priority;
-    _description = widget.task.description;
-    _color = widget.task.color;
+  _title = widget.task.title;
+  _priority = widget.task.priority;
+  _description = widget.task.description;
+  _color = widget.task.color;
 
-    _dueDate = widget.task.dueDate;
-    _startDate = widget.task.startDate;
-    _endDate = widget.task.endDate;
+  _dueDate = widget.task.dueDate;
+  _startDate = widget.task.startDate;
+  _endDate = widget.task.endDate;
 
-    _repeatAfterValue = getRepeatAfterValueFromDuration(
-      widget.task.repeatAfter,
-    );
-    _repeatAfterUnit = getRepeatAfterTypeFromDuration(widget.task.repeatAfter);
+  _repeatAfterValue = getRepeatAfterValueFromDuration(
+    widget.task.repeatAfter,
+  );
+  _repeatAfterUnit = getRepeatAfterTypeFromDuration(widget.task.repeatAfter);
 
-    super.initState();
+  super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openInitialSection();
-    });
-  }
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await _loadFreshTask();
+    if (!mounted) return;
+    _openInitialSection();
+  });
+}
 
   @override
   void dispose() {
@@ -218,11 +224,13 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
           child: SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {
-                if (_formKey.currentState?.validate() == true) {
-                  _saveTask(ctx);
-                }
-              },
+              onPressed: _isLoadingTask
+                  ? null
+                  : () {
+                     if (_formKey.currentState?.validate() == true) {
+                        _saveTask(ctx);
+                    }
+                  },
               icon: const Icon(Icons.save_outlined),
               label: Text(AppLocalizations.of(context).save),
             ),
@@ -1288,54 +1296,111 @@ class TaskEditPageState extends ConsumerState<TaskEditPage> {
   }
 
   Future<void> _saveTask(BuildContext context) async {
-    _reminderDates?.removeWhere((d) => d.reminder == DateTime(0));
+  _reminderDates?.removeWhere((d) => d.reminder == DateTime(0));
 
-    final updatedTask =
-        widget.task.copyWith(
-            title: _title,
-            description: _description,
-            reminderDates: _reminderDates,
-            priority: _priority,
-            labels: _labels,
-            assignees: _assignees,
-            repeatAfter: _repeatAfterUnit.getDuration(_repeatAfterValue),
-          )
-          ..dueDate = _dueDate
-          ..startDate = _startDate
-          ..endDate = _endDate
-          ..color = _color;
+  debugPrint('===== TASK EDIT SAVE =====');
+  debugPrint('widget.task.id: ${widget.task.id}');
+  debugPrint('widget.task.assignees: ${widget.task.assignees.map((e) => '${e.id}:${e.username}').toList()}');
+  debugPrint('_assignees before copyWith: ${_assignees.map((e) => '${e.id}:${e.username}').toList()}');
+  debugPrint('_title: $_title');
+  debugPrint('_description: $_description');
+  debugPrint('changed: $changed');
 
-    if (_labels != null) {
-      var updateLabelSuccess = await ref
-          .read(taskLabelBulkRepositoryProvider)
-          .update(updatedTask, _labels!);
+  final baseTask = _freshTask ?? widget.task;
 
-      if (!updateLabelSuccess.isSuccessful && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).taskSaveError)),
-        );
-        return;
-      }
-    }
+final updatedTask =
+    baseTask.copyWith(
+      title: _title,
+      description: _description,
+      reminderDates: _reminderDates,
+      priority: _priority,
+      labels: _labels,
+      assignees: _assignees,
+      repeatAfter: _repeatAfterUnit.getDuration(_repeatAfterValue),
+    )
+      ..dueDate = _dueDate
+      ..startDate = _startDate
+      ..endDate = _endDate
+      ..color = _color;
 
-    var saveSuccess = await ref
-        .read(taskPageControllerProvider.notifier)
-        .updateTask(updatedTask);
+  debugPrint('updatedTask.assignees: ${updatedTask.assignees.map((e) => '${e.id}:${e.username}').toList()}');
+  debugPrint('==========================');
 
-    if (context.mounted) {
-      if (saveSuccess) {
-        Navigator.of(context).pop(updatedTask);
+  if (_labels != null) {
+    var updateLabelSuccess = await ref
+        .read(taskLabelBulkRepositoryProvider)
+        .update(updatedTask, _labels!);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).taskUpdatedSuccess),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).taskSaveError)),
-        );
-      }
+    if (!updateLabelSuccess.isSuccessful && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).taskSaveError)),
+      );
+      return;
     }
   }
+
+  var saveSuccess = await ref
+      .read(taskPageControllerProvider.notifier)
+      .updateTask(updatedTask);
+
+  debugPrint('saveSuccess: $saveSuccess');
+
+  if (context.mounted) {
+    if (saveSuccess) {
+      Navigator.of(context).pop(updatedTask);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).taskUpdatedSuccess),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).taskSaveError)),
+      );
+    }
+  }
+}
+Future<void> _loadFreshTask() async {
+  if (widget.task.id == 0) return;
+
+  setState(() {
+    _isLoadingTask = true;
+  });
+
+  final response = await ref.read(taskRepositoryProvider).getTask(widget.task.id);
+
+  if (!mounted) return;
+
+  if (response.isSuccessful) {
+    final freshTask = response.toSuccess().body;
+
+    setState(() {
+      _freshTask = freshTask;
+      _reminderDates = List.of(freshTask.reminderDates);
+      _labels = List.of(freshTask.labels);
+      _assignees = List.of(freshTask.assignees);
+
+      _title = freshTask.title;
+      _description = freshTask.description;
+      _priority = freshTask.priority;
+      _color = freshTask.color;
+
+      _dueDate = freshTask.dueDate;
+      _startDate = freshTask.startDate;
+      _endDate = freshTask.endDate;
+
+      _repeatAfterValue = getRepeatAfterValueFromDuration(
+        freshTask.repeatAfter,
+      );
+      _repeatAfterUnit = getRepeatAfterTypeFromDuration(
+        freshTask.repeatAfter,
+      );
+    });
+  }
+
+  setState(() {
+    _isLoadingTask = false;
+  });
+}
 }

@@ -30,7 +30,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace 'io.vikunja.flutteringvikunja'
+    namespace 'com.doneits.app'
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
 
@@ -47,7 +47,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "io.vikunja.app"
+        applicationId "com.doneits.app"
         minSdkVersion flutter.minSdkVersion
         targetSdk flutter.targetSdkVersion
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
@@ -67,23 +67,11 @@ android {
         }
     }
 
-    productFlavors {
-        unsigned {
-            signingConfig signingConfigs.debug
-            applicationIdSuffix ".unsigned"
-        }
-        production {
-            signingConfig signingConfigs.release
-        }
-    }
-
     flavorDimensions "deploy"
 
-    android.applicationVariants.all { variant ->
-        if (variant.flavorName == "fdroid") {
-            variant.outputs.all { output ->
-                output.outputFileName = "app-fdroid-release.apk"
-            }
+    productFlavors {
+        production {
+            signingConfig signingConfigs.release
         }
     }
 
@@ -92,7 +80,6 @@ android {
             signingConfig signingConfigs.release
         }
         debug {
-            //signingConfig signingConfigs.debug
         }
     }
 

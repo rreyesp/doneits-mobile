@@ -1,4 +1,4 @@
-package io.vikunja.flutteringvikunja
+package com.doneits.app
 
 import android.content.Intent
 import androidx.annotation.NonNull

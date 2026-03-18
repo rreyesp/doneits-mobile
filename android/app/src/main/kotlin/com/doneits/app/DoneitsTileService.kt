@@ -1,4 +1,4 @@
-package io.vikunja.flutteringvikunja
+package com.doneits.app
 
 
 import android.content.Intent
@@ -11,7 +11,7 @@ import androidx.annotation.RequiresApi
 const val INTENT_TYPE_ADD_TASK = "ADD_NEW_TASK"
 
 @RequiresApi(Build.VERSION_CODES.N)
-class VikunjaTileService : TileService(){
+class DoneitsTileService : TileService(){
 
     override fun onClick() {
         super.onClick()

@@ -91,7 +91,7 @@
             android:stopWithTask="false"/>
 
         <service
-            android:name=".VikunjaTileService"
+            android:name=".DoneitsTileService"
             android:icon="@mipmap/ic_launcher"
             android:label="Add Task"
             android:exported="true"

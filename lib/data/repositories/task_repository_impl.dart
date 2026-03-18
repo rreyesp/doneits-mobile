@@ -85,22 +85,36 @@ Future<Response<Task>> add(int projectId, Task task) async {
     return _dataSource.delete(taskId);
   }
 
-  @override
-Future<Response<Task>> update(Task task) async {
+  Future<Response<Task>> update(Task task) async {
+  debugPrint('===== TASK REPOSITORY UPDATE =====');
+  debugPrint('incoming task.id: ${task.id}');
+  debugPrint('incoming task.assignees: ${task.assignees.map((e) => '${e.id}:${e.username}').toList()}');
+
   final currentTaskResponse = await _dataSource.getTask(task.id);
+
   if (!currentTaskResponse.isSuccessful) {
+    debugPrint('currentTaskResponse failed');
     return currentTaskResponse.toDomain();
   }
 
   final currentTask = currentTaskResponse.toSuccess().body.toDomain();
 
-  final updateResponse = await _dataSource.update(TaskDto.fromDomain(task));
+  debugPrint('currentTask.assignees: ${currentTask.assignees.map((e) => '${e.id}:${e.username}').toList()}');
+
+  final updateDto = TaskDto.fromDomain(task);
+  debugPrint('update dto json: ${updateDto.toJSON()}');
+
+  final updateResponse = await _dataSource.update(updateDto);
 
   if (!updateResponse.isSuccessful) {
+    debugPrint('updateResponse failed');
     return updateResponse.toDomain();
   }
 
   final updatedTask = updateResponse.toSuccess().body;
+
+  debugPrint('updatedTask.id after update: ${updatedTask.id}');
+  debugPrint('updatedTask.assignees from backend update response: ${updatedTask.assignees.map((e) => '${e.id}:${e.username}').toList()}');
 
   final currentIds = currentTask.assignees.map((e) => e.id).toSet();
   final desiredIds = task.assignees.map((e) => e.id).toSet();
@@ -108,13 +122,22 @@ Future<Response<Task>> update(Task task) async {
   final idsToAdd = desiredIds.difference(currentIds);
   final idsToRemove = currentIds.difference(desiredIds);
 
+  debugPrint('currentIds: $currentIds');
+  debugPrint('desiredIds: $desiredIds');
+  debugPrint('idsToAdd: $idsToAdd');
+  debugPrint('idsToRemove: $idsToRemove');
+
   for (final userId in idsToRemove) {
+    debugPrint('Removing assignee -> taskId=${updatedTask.id}, userId=$userId');
+
     final removeResponse = await _dataSource.deleteAssignee(
       updatedTask.id,
       userId,
     );
 
     if (!removeResponse.isSuccessful) {
+      debugPrint('deleteAssignee failed for userId=$userId');
+
       if (removeResponse.isError) {
         return ErrorResponse<Task>(
           removeResponse.toError().statusCode,
@@ -133,12 +156,16 @@ Future<Response<Task>> update(Task task) async {
   for (final assignee in task.assignees) {
     if (!idsToAdd.contains(assignee.id)) continue;
 
+    debugPrint('Adding assignee -> taskId=${updatedTask.id}, userId=${assignee.id}, username=${assignee.username}');
+
     final assignResponse = await _dataSource.addAssignee(
       updatedTask.id,
       assignee.id,
     );
 
     if (!assignResponse.isSuccessful) {
+      debugPrint('addAssignee failed for userId=${assignee.id}');
+
       if (assignResponse.isError) {
         return ErrorResponse<Task>(
           assignResponse.toError().statusCode,
@@ -155,6 +182,16 @@ Future<Response<Task>> update(Task task) async {
   }
 
   final refreshedTaskResponse = await _dataSource.getTask(updatedTask.id);
+
+  if (refreshedTaskResponse.isSuccessful) {
+    final refreshedTask = refreshedTaskResponse.toSuccess().body.toDomain();
+    debugPrint('refreshedTask.assignees: ${refreshedTask.assignees.map((e) => '${e.id}:${e.username}').toList()}');
+  } else {
+    debugPrint('refreshedTaskResponse failed');
+  }
+
+  debugPrint('=================================');
+
   return refreshedTaskResponse.toDomain();
 }
 
